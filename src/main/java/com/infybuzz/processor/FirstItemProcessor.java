@@ -3,13 +3,21 @@ package com.infybuzz.processor;
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.stereotype.Component;
 
+import com.infybuzz.model.StudentJdbc;
+import com.infybuzz.model.StudentJson;
+
 @Component
-public class FirstItemProcessor implements ItemProcessor<Integer, Long> {
+public class FirstItemProcessor implements ItemProcessor<StudentJdbc, StudentJson> {
 
 	@Override
-	public Long process(Integer item) throws Exception {
+	public StudentJson process(StudentJdbc item) throws Exception {
 		System.out.println("Inside Item processor");
-		return Long.valueOf(item + 20);
+		StudentJson studentJson = new StudentJson();
+		studentJson.setId(item.getId());
+		studentJson.setFirstName(item.getFirstName());
+		studentJson.setLastName(item.getLastName());
+		studentJson.setEmail(item.getEmail());
+		return studentJson;
 	}
 
 }
