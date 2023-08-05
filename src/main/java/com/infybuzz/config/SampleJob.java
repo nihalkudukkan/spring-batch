@@ -3,6 +3,8 @@ package com.infybuzz.config;
 import java.io.File;
 import java.io.IOException;
 import java.io.Writer;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.Date;
 
 import javax.sql.DataSource;
@@ -16,6 +18,9 @@ import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.item.adapter.ItemReaderAdapter;
+import org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider;
+import org.springframework.batch.item.database.ItemPreparedStatementSetter;
+import org.springframework.batch.item.database.JdbcBatchItemWriter;
 import org.springframework.batch.item.database.JdbcCursorItemReader;
 import org.springframework.batch.item.file.FlatFileFooterCallback;
 import org.springframework.batch.item.file.FlatFileHeaderCallback;
@@ -95,15 +100,17 @@ public class SampleJob {
 		return new StepBuilder("First Chunk Step")
 				.repository(jobRepository)
 				.transactionManager(transactionManager)
-				.<StudentJdbc, StudentJson>chunk(3)
-//				.reader(flatFileItemReader(null))
+				.<StudentCsv, StudentCsv>chunk(1)
+				.reader(flatFileItemReader(null))
 //				.reader(jsonItemReader(null))
-				.reader(jdbcCursorItemReader())
+//				.reader(jdbcCursorItemReader())
 //				.reader(itemReaderAdapter())
-				.processor(firstItemProcessor)
+//				.processor(firstItemProcessor)
 //				.writer(firstItemWriter)
 //				.writer(flatFileItemWriter(null))
-				.writer(jsonFileItemWriter(null))
+//				.writer(jsonFileItemWriter(null))
+				.writer(jdbcBatchItemWriter())
+//				.writer(jdbcBatchItemWriter1())
 				.build();		
 	}
 	
@@ -201,5 +208,36 @@ public class SampleJob {
 		JsonFileItemWriter<StudentJson> jsonFileItemWriter = new JsonFileItemWriter<StudentJson>(fileSystemResource,
 				new JacksonJsonObjectMarshaller<StudentJson>());
 		return jsonFileItemWriter;
+	}
+	
+//	@StepScope
+	@Bean
+	public JdbcBatchItemWriter<StudentCsv> jdbcBatchItemWriter() {
+		JdbcBatchItemWriter<StudentCsv> jdbcBatchItemWriter = new JdbcBatchItemWriter<StudentCsv>();
+		jdbcBatchItemWriter.setDataSource(universitydatasource());
+		jdbcBatchItemWriter.setSql("insert into students(id,firstName,lastName,email) values (:id,:firstName,:lastName,:email)");
+//		jdbcBatchItemWriter.setSql("update students set firstName=:firstName,lastName=:lastName,email=:email where id=:id");
+		jdbcBatchItemWriter.setItemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<StudentCsv>());
+		return jdbcBatchItemWriter;
+	}
+	
+	@Bean
+	public JdbcBatchItemWriter<StudentCsv> jdbcBatchItemWriter1() {
+		JdbcBatchItemWriter<StudentCsv> jdbcBatchItemWriter = new JdbcBatchItemWriter<StudentCsv>();
+		jdbcBatchItemWriter.setDataSource(universitydatasource());
+		jdbcBatchItemWriter.setSql("insert into students(id,firstName,lastName,email) values (?,?,?,?)");
+//		jdbcBatchItemWriter.setSql("update students set firstName=:firstName,lastName=:lastName,email=:email where id=:id");
+//		jdbcBatchItemWriter.setItemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<StudentCsv>());
+		jdbcBatchItemWriter.setItemPreparedStatementSetter(new ItemPreparedStatementSetter<StudentCsv>() {
+			
+			@Override
+			public void setValues(StudentCsv item, PreparedStatement ps) throws SQLException {
+				ps.setLong(1, item.getId());
+				ps.setString(2, item.getFirstName());
+				ps.setString(2, item.getLastName());
+				ps.setString(4, item.getEmail());
+			}
+		});
+		return jdbcBatchItemWriter;
 	}
 }
