@@ -1,6 +1,5 @@
 package com.infybuzz.config;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.Writer;
 import java.sql.PreparedStatement;
@@ -16,8 +15,8 @@ import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
-import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.item.adapter.ItemReaderAdapter;
+import org.springframework.batch.item.adapter.ItemWriterAdapter;
 import org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider;
 import org.springframework.batch.item.database.ItemPreparedStatementSetter;
 import org.springframework.batch.item.database.JdbcBatchItemWriter;
@@ -31,12 +30,10 @@ import org.springframework.batch.item.file.mapping.DefaultLineMapper;
 import org.springframework.batch.item.file.transform.BeanWrapperFieldExtractor;
 import org.springframework.batch.item.file.transform.DelimitedLineAggregator;
 import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
-import org.springframework.batch.item.file.transform.LineTokenizer;
 import org.springframework.batch.item.json.JacksonJsonObjectMarshaller;
 import org.springframework.batch.item.json.JacksonJsonObjectReader;
 import org.springframework.batch.item.json.JsonFileItemWriter;
 import org.springframework.batch.item.json.JsonItemReader;
-import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -48,8 +45,6 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.transaction.PlatformTransactionManager;
 
-import com.infybuzz.listner.FirstJobListner;
-import com.infybuzz.listner.FirstStepListner;
 import com.infybuzz.model.StudentCsv;
 import com.infybuzz.model.StudentJdbc;
 import com.infybuzz.model.StudentJson;
@@ -109,7 +104,7 @@ public class SampleJob {
 //				.writer(firstItemWriter)
 //				.writer(flatFileItemWriter(null))
 //				.writer(jsonFileItemWriter(null))
-				.writer(jdbcBatchItemWriter())
+				.writer(itemWriterAdapter())
 //				.writer(jdbcBatchItemWriter1())
 				.build();		
 	}
@@ -164,7 +159,9 @@ public class SampleJob {
 		return jdbcCursorItemReader;
 	}
 	
-	/*
+	/**
+	 * to make api calls
+	 */
 	public ItemReaderAdapter<StudentResponse> itemReaderAdapter() {
 		ItemReaderAdapter<StudentResponse> itemReaderAdapter = new ItemReaderAdapter<StudentResponse>();
 		
@@ -173,7 +170,6 @@ public class SampleJob {
 		
 		return itemReaderAdapter;
 	}
-	*/
 	
 	@StepScope
 	@Bean
@@ -239,5 +235,17 @@ public class SampleJob {
 			}
 		});
 		return jdbcBatchItemWriter;
+	}
+	
+	/**
+	 * rest call
+	 */
+	public ItemWriterAdapter<StudentCsv> itemWriterAdapter() {
+		ItemWriterAdapter<StudentCsv> itemWriterAdapter = new ItemWriterAdapter<>();
+		
+		itemWriterAdapter.setTargetObject(studentService);
+		itemWriterAdapter.setTargetMethod("restCallToCreateStudent");
+		
+		return itemWriterAdapter;
 	}
 }
