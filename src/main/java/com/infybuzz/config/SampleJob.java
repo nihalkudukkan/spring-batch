@@ -5,6 +5,7 @@ import java.io.Writer;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Date;
+import java.util.List;
 
 import javax.sql.DataSource;
 
@@ -15,6 +16,7 @@ import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.batch.core.step.skip.AlwaysSkipItemSkipPolicy;
 import org.springframework.batch.item.adapter.ItemReaderAdapter;
 import org.springframework.batch.item.adapter.ItemWriterAdapter;
 import org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider;
@@ -25,6 +27,7 @@ import org.springframework.batch.item.file.FlatFileFooterCallback;
 import org.springframework.batch.item.file.FlatFileHeaderCallback;
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.FlatFileItemWriter;
+import org.springframework.batch.item.file.FlatFileParseException;
 import org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;
 import org.springframework.batch.item.file.mapping.DefaultLineMapper;
 import org.springframework.batch.item.file.transform.BeanWrapperFieldExtractor;
@@ -45,6 +48,8 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import com.infybuzz.listner.SkipListener;
+import com.infybuzz.listner.SkipListenerImpl;
 import com.infybuzz.model.StudentCsv;
 import com.infybuzz.model.StudentJdbc;
 import com.infybuzz.model.StudentJson;
@@ -68,6 +73,12 @@ public class SampleJob {
 	
 	@Autowired
 	private StudentService studentService;
+	
+	@Autowired
+	private SkipListener skipListener;
+	
+	@Autowired
+	private SkipListenerImpl skipListenerImpl;
 	
 	@Bean
 	@Primary
@@ -95,18 +106,24 @@ public class SampleJob {
 		return new StepBuilder("First Chunk Step")
 				.repository(jobRepository)
 				.transactionManager(transactionManager)
-				.<StudentCsv, StudentCsv>chunk(1)
+				.<StudentCsv, StudentJson>chunk(1)
 				.reader(flatFileItemReader(null))
 //				.reader(jsonItemReader(null))
 //				.reader(jdbcCursorItemReader())
 //				.reader(itemReaderAdapter())
-//				.processor(firstItemProcessor)
+				.processor(firstItemProcessor)
 //				.writer(firstItemWriter)
 //				.writer(flatFileItemWriter(null))
-//				.writer(jsonFileItemWriter(null))
-				.writer(itemWriterAdapter())
+				.writer(jsonFileItemWriter(null))
+//				.writer(itemWriterAdapter())
 //				.writer(jdbcBatchItemWriter1())
-				.build();		
+				.faultTolerant()
+				.skip(FlatFileParseException.class)
+//				.skipLimit(Integer.MAX_VALUE)
+				.skipPolicy(new AlwaysSkipItemSkipPolicy())
+//				.listener(skipListener)
+				.listener(skipListenerImpl)
+				.build();
 	}
 	
 	@StepScope
@@ -202,7 +219,19 @@ public class SampleJob {
 	@Bean
 	public JsonFileItemWriter<StudentJson> jsonFileItemWriter(@Value("${outputFile}") FileSystemResource fileSystemResource) {
 		JsonFileItemWriter<StudentJson> jsonFileItemWriter = new JsonFileItemWriter<StudentJson>(fileSystemResource,
-				new JacksonJsonObjectMarshaller<StudentJson>());
+				new JacksonJsonObjectMarshaller<StudentJson>()) {
+
+					@Override
+					public String doWrite(List<? extends StudentJson> items) {
+						items.stream().forEach(item->{
+							if(item.getId()==3) {
+								throw new NullPointerException();
+							}
+						});
+						return super.doWrite(items);
+					}
+			
+		};
 		return jsonFileItemWriter;
 	}
 	
